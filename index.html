@@ -1,134 +1,284 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>QR Scanner Widget</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Interactive 3D Dice Roller</title>
+  <style>
+    body {
+      margin: 0;
+      height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: radial-gradient(circle at 30% 30%, #3f51b5, #1a237e);
+      font-family: Poppins, Arial, sans-serif;
+      overflow: hidden;
+      color: #fff;
+    }
 
-<!-- ✅ HTML5 QR Code Library -->
-<script src="https://unpkg.com/html5-qrcode@2.3.9/minified/html5-qrcode.min.js"></script>
+    .wrapper {
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      height: 100%;
+    }
 
-<style>
-  body {
-    margin: 0;
-    font-family: system-ui, sans-serif;
-    background: #0d1117;
-    color: #f0f6fc;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: flex-start;
-    min-height: 100vh;
-    padding: 2rem;
-  }
+    .dice-wrap {
+      perspective: 1000px;
+      width: 200px;
+      height: 200px;
+      cursor: pointer;
+      animation: float 4s ease-in-out infinite;
+    }
 
-  .container {
-    background: #161b22;
-    border-radius: 1rem;
-    box-shadow: 0 0 20px rgba(0,0,0,0.4);
-    padding: 1.5rem;
-    max-width: 500px;
-    width: 100%;
-  }
+    @keyframes float {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-10px); }
+    }
 
-  h2 {
-    color: #58a6ff;
-    text-align: center;
-  }
+    .dice {
+      position: relative;
+      width: 150px;
+      height: 150px;
+      transform-style: preserve-3d;
+      transition: transform 1.2s cubic-bezier(.2,.9,.2,1);
+    }
 
-  #qr-reader {
-    width: 100%;
-    border-radius: 0.75rem;
-    overflow: hidden;
-  }
+    .face {
+      position: absolute;
+      width: 150px;
+      height: 150px;
+      background: radial-gradient(circle at 40% 40%, #5c6bc0, #283593);
+      border-radius: 20px;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      grid-template-rows: repeat(3, 1fr);
+      align-items: center;
+      justify-items: center;
+      box-shadow: 0 0 25px rgba(0,0,0,0.4);
+      backface-visibility: hidden;
+    }
 
-  #result {
-    background: #0d1117;
-    border-radius: 0.5rem;
-    padding: 0.75rem;
-    margin-top: 1rem;
-    font-size: 0.9rem;
-    word-break: break-all;
-  }
+    .pip {
+      width: 22px;
+      height: 22px;
+      background: white;
+      border-radius: 50%;
+      box-shadow: 0 0 10px rgba(255,255,255,0.5);
+    }
 
-  button {
-    margin-top: 1rem;
-    width: 100%;
-    padding: 0.75rem;
-    border: none;
-    border-radius: 0.5rem;
-    background: #238636;
-    color: #fff;
-    font-size: 1rem;
-    cursor: pointer;
-  }
-  button:hover { background: #2ea043; }
+    .front { transform: rotateY(0deg) translateZ(75px); }
+    .back { transform: rotateY(180deg) translateZ(75px); }
+    .right { transform: rotateY(90deg) translateZ(75px); }
+    .left { transform: rotateY(-90deg) translateZ(75px); }
+    .top { transform: rotateX(90deg) translateZ(75px); }
+    .bottom { transform: rotateX(-90deg) translateZ(75px); }
 
-  .error { color: #f85149; margin-top: 1rem; text-align: center; }
-</style>
+    .history-container {
+      position: absolute;
+      right: 80px;
+      top: 50%;
+      transform: translateY(-50%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .mini-dice {
+      width: 60px;
+      height: 60px;
+      background: linear-gradient(180deg, #7986cb, #3f51b5);
+      border-radius: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+      font-weight: bold;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, .4);
+      animation: pop .4s ease;
+    }
+
+    @keyframes pop {
+      0% { transform: scale(0.6); opacity: 0; }
+      100% { transform: scale(1); opacity: 1; }
+    }
+
+    .click-text {
+      position: absolute;
+      bottom: 80px;
+      text-align: center;
+      font-size: 18px;
+      color: rgba(255,255,255,0.85);
+      letter-spacing: 1px;
+      animation: blink 2s infinite;
+    }
+
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+
+    .combo-text {
+      position: absolute;
+      top: 100px;
+      font-size: 32px;
+      font-weight: bold;
+      color: gold;
+      opacity: 0;
+      animation: comboPop 1s ease forwards;
+    }
+
+    @keyframes comboPop {
+      0% { transform: scale(0.6); opacity: 0; }
+      50% { transform: scale(1.4); opacity: 1; }
+      100% { transform: scale(1); opacity: 0; }
+    }
+
+    .particle {
+      position: absolute;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.3);
+      animation: rise 6s linear infinite;
+    }
+
+    @keyframes rise {
+      0% { transform: translateY(100vh) scale(0.3); opacity: 0; }
+      100% { transform: translateY(-10vh) scale(1); opacity: 1; }
+    }
+  </style>
 </head>
 <body>
+  <div class="wrapper">
+    <div class="dice-wrap" id="diceWrap">
+      <div id="dice" class="dice"></div>
+    </div>
+    <div class="click-text">Tap the dice to roll</div>
+    <div class="history-container" id="history"></div>
+    <div id="combo" class="combo-text"></div>
+  </div>
 
-<div class="container">
-  <h2>QR Scanner Widget</h2>
-  <div id="qr-reader"></div>
-  <button id="grantPermissionBtn">🎥 Grant Camera Access</button>
-  <div id="result">No result yet.</div>
-  <div class="error" id="error"></div>
-</div>
+  <script>
+    const dice = document.getElementById('dice');
+    const diceWrap = document.getElementById('diceWrap');
+    const historyEl = document.getElementById('history');
+    const comboText = document.getElementById('combo');
 
-<script>
-  const qrReader = document.getElementById("qr-reader");
-  const grantBtn = document.getElementById("grantPermissionBtn");
-  const resultDiv = document.getElementById("result");
-  const errorDiv = document.getElementById("error");
-  let html5QrCode;
+    const faceRotations = {
+      1: { x: 0, y: 0 },
+      2: { x: -90, y: 0 },
+      3: { x: 0, y: -90 },
+      4: { x: 0, y: 90 },
+      5: { x: 90, y: 0 },
+      6: { x: 180, y: 0 }
+    };
 
-  async function requestCameraPermission() {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-      stream.getTracks().forEach(t => t.stop()); // stop preview
-      startScanner();
-    } catch (err) {
-      errorDiv.textContent = "❌ Camera permission denied or not available.";
+    // Create dice faces with pips
+    function createDiceFaces() {
+      const faces = [
+        [5], // 1 center pip
+        [0,8], // 2 diagonal corners
+        [0,4,8], // 3 diagonal with center
+        [0,2,6,8], // 4 corners
+        [0,2,4,6,8], // 5
+        [0,1,2,6,7,8] // 6
+      ];
+
+      Object.keys(faceRotations).forEach(num => {
+        const face = document.createElement('div');
+        face.classList.add('face');
+        faces[num-1].forEach(i => {
+          const pip = document.createElement('div');
+          pip.classList.add('pip');
+          face.appendChild(pip);
+        });
+        const rotations = Object.values(faceRotations)[num-1];
+        face.style.transform = `rotateX(${rotations.x}deg) rotateY(${rotations.y}deg) translateZ(75px)`;
+        dice.appendChild(face);
+      });
     }
-  }
 
-  async function startScanner() {
-    errorDiv.textContent = "";
-    grantBtn.style.display = "none";
-    html5QrCode = new Html5Qrcode("qr-reader");
-    const cameras = await Html5Qrcode.getCameras();
-    if (!cameras || !cameras.length) {
-      errorDiv.textContent = "❌ No camera found on this device.";
-      return;
+    createDiceFaces();
+
+    for(let i=0; i<25; i++){
+      const p=document.createElement('div');
+      p.className='particle';
+      p.style.width=p.style.height=`${Math.random()*8+4}px`;
+      p.style.left=`${Math.random()*100}%`;
+      p.style.animationDelay=`${Math.random()*6}s`;
+      document.body.appendChild(p);
     }
-    const camId = cameras[0].id;
-    html5QrCode.start(
-      camId,
-      { fps: 10, qrbox: 250 },
-      decodedText => {
-        resultDiv.textContent = "✅ " + decodedText;
-        navigator.vibrate?.(100);
-      },
-      errorMessage => {}
-    ).catch(err => {
-      errorDiv.textContent = "⚠️ Error starting camera: " + err;
-    });
-  }
 
-  // Initialize: hide button if already granted
-  (async () => {
-    try {
-      const permission = await navigator.permissions.query({ name: "camera" });
-      if (permission.state === "granted") startScanner();
-      else grantBtn.style.display = "block";
-    } catch {
-      grantBtn.style.display = "block";
+    let comboCount = 1;
+    let lastValue = null;
+
+    function getRandomInt(min, max) {
+      return Math.floor(Math.random() * (max - min + 1)) + min;
     }
-  })();
 
-  grantBtn.addEventListener("click", requestCameraPermission);
-</script>
+    function rollDice() {
+      const value = getRandomInt(1, 6);
+      const rotation = faceRotations[value];
+      const rx = rotation.x + 360 * getRandomInt(1, 3);
+      const ry = rotation.y + 360 * getRandomInt(1, 3);
+
+      dice.style.transform = `rotateX(${rx}deg) rotateY(${ry}deg)`;
+
+      const sound = new Audio('https://actions.google.com/sounds/v1/cartoon/wood_plank_flicks.ogg');
+      sound.play();
+
+      if (lastValue === value) {
+        comboCount++;
+        showCombo(comboCount);
+      } else {
+        comboCount = 1;
+      }
+      lastValue = value;
+
+      setTimeout(() => {
+        addMiniHistory(value);
+      }, 1200);
+    }
+
+    function showCombo(count) {
+      if (count >= 3) {
+        comboText.textContent = `Combo ${count}!`;
+        comboText.style.opacity = '1';
+        comboText.style.animation = 'none';
+        void comboText.offsetWidth;
+        comboText.style.animation = 'comboPop 1s ease forwards';
+        triggerComboEffect(count);
+      }
+    }
+
+    function triggerComboEffect(count) {
+      for (let i = 0; i < 15 + count * 5; i++) {
+        const conf = document.createElement('div');
+        conf.className = 'particle';
+        conf.style.background = count > 4 ? 'gold' : 'aqua';
+        conf.style.width = conf.style.height = `${Math.random()*10+4}px`;
+        conf.style.left = `${50 + (Math.random()*100 - 50)}%`;
+        conf.style.top = '50%';
+        conf.style.animation = `rise ${3 + Math.random()*3}s linear forwards`;
+        document.body.appendChild(conf);
+        setTimeout(()=>conf.remove(),4000);
+      }
+    }
+
+    function addMiniHistory(val) {
+      const mini = document.createElement('div');
+      mini.className = 'mini-dice';
+      mini.textContent = val;
+      historyEl.prepend(mini);
+      while (historyEl.childElementCount > 2) {
+        historyEl.removeChild(historyEl.lastChild);
+      }
+    }
+
+    diceWrap.addEventListener('click', rollDice);
+  </script>
 </body>
 </html>
