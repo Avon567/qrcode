@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>QR Scanner Widget (Notion Embed)</title>
+  <style>
+    :root{font-family:Inter,ui-sans-serif,system-ui,-apple-system,
+      "Segoe UI",Roboto,"Helvetica Neue",Arial;}
+    body{margin:0;background:#0f172a;color:#e6edf3;display:flex;align-items:center;justify-content:center;height:100vh}
+    .card{width:min(820px,96vw);background:linear-gradient(180deg,#071024 0%, #0b1220 100%);border-radius:12px;padding:18px;box-shadow:0 10px 30px rgba(2,6,23,0.7)}
+    h1{margin:0 0 8px;font-size:18px}
+    p{margin:0 0 12px;color:#a8b3c7;font-size:13px}
+    #reader{width:100%;height:420px;background:#000;border-radius:8px;display:flex;align-items:center;justify-content:center;overflow:hidden}
+    .controls{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
+    button, select, input{background:#06202f;border:1px solid rgba(255,255,255,0.04);color:#dce9f8;padding:8px 10px;border-radius:8px;font-size:13px}
+    button.primary{background:linear-gradient(90deg,#0ea5a4,#3b82f6);color:#04202a}
+    .result{margin-top:12px;padding:10px;border-radius:8px;background:rgba(255,255,255,0.03);font-size:14px;word-break:break-all}
+    .small{font-size:12px;color:#8fa3bf}
+    .row{display:flex;gap:8px;align-items:center}
+    @media (max-width:520px){#reader{height:320px}}
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>QR Scanner Widget</h1>
+    <p class="small">Designed to be hosted as a single public HTML page and embedded into Notion with an Embed block. Uses your camera to scan QR codes.</p>
+
+    <div id="reader">Initializing camera…</div>
+
+    <div class="controls">
+      <div class="row">
+        <select id="cameraSelect"></select>
+        <button id="startBtn" class="primary">Start</button>
+        <button id="stopBtn">Stop</button>
+      </div>
+      <div class="row">
+        <button id="copyBtn">Copy</button>
+        <button id="openBtn">Open</button>
+      </div>
+      <div class="row" style="margin-left:auto">
+        <label class="small">Torch</label>
+        <input type="checkbox" id="torchToggle" />
+      </div>
+    </div>
+
+    <div id="result" class="result">No QR detected yet.</div>
+  </div>
+
+  <!-- html5-qrcode library (small, works well inside embeds) -->
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/minified/html5-qrcode.min.js"></script>
+  <script>
+    // Simple single-file QR scanner widget. Ready to be hosted and embedded in Notion.
+    const readerEl = document.getElementById('reader');
+    const cameraSelect = document.getElementById('cameraSelect');
+    const startBtn = document.getElementById('startBtn');
+    const stopBtn = document.getElementById('stopBtn');
+    const resultEl = document.getElementById('result');
+    const copyBtn = document.getElementById('copyBtn');
+    const openBtn = document.getElementById('openBtn');
+    const torchToggle = document.getElementById('torchToggle');
+
+    let html5QrCode = null;
+    let currentCameraId = null;
+    let isRunning = false;
+
+    function setResult(text){
+      resultEl.textContent = text || 'No QR detected yet.';
+    }
+
+    async function listCameras(){
+      try{
+        const devices = await Html5Qrcode.getCameras();
+        cameraSelect.innerHTML = '';
+        devices.forEach(dev=>{
+          const opt = document.createElement('option');
+          opt.value = dev.id; opt.textContent = dev.label || dev.id;
+          cameraSelect.appendChild(opt);
+        });
+        if(devices.length) cameraSelect.value = devices[0].id;
+      }catch(e){
+        cameraSelect.innerHTML = '<option value="">No camera found</option>';
+      }
+    }
+
+    async function startScanner(cameraId){
+      if(isRunning) return;
+      html5QrCode = new Html5Qrcode(/* element id */ "reader", /* verbose= */ false);
+      const config = { fps: 10, qrbox: { width: Math.min(400, readerEl.clientWidth - 20), height: Math.min(300, readerEl.clientHeight - 20) } };
+      try{
+        await html5QrCode.start(
+          cameraId,
+          config,
+          qrCodeMessage => {
+            setResult(qrCodeMessage);
+          },
+          errorMessage => {
+            // scanning error or no QR in frame
+          }
+        );
+        isRunning = true;
+        currentCameraId = cameraId;
+      }catch(err){
+        setResult('Camera start failed: ' + err);
+      }
+    }
+
+    async function stopScanner(){
+      if(!html5QrCode) return;
+      try{ await html5QrCode.stop(); }catch(e){}
+      try{ html5QrCode.clear(); }catch(e){}
+      html5QrCode = null;
+      isRunning = false;
+    }
+
+    // copy and open handlers
+    copyBtn.addEventListener('click', ()=>{
+      const text = resultEl.textContent || '';
+      if(!text) return;
+      navigator.clipboard.writeText(text).then(()=>{
+        copyBtn.textContent = 'Copied';
+        setTimeout(()=> copyBtn.textContent = 'Copy', 1200);
+      }).catch(()=> alert('Copy failed'));
+    });
+    openBtn.addEventListener('click', ()=>{
+      const text = resultEl.textContent || '';
+      if(!text) return;
+      // if it looks like a URL, open it, else just open in new tab as text search
+      try{
+        const url = new URL(text);
+        window.open(url.href, '_blank');
+      }catch(e){
+        const w = window.open('', '_blank');
+        w.document.body.innerText = text;
+      }
+    });
+
+    startBtn.addEventListener('click', async ()=>{
+      const cam = cameraSelect.value;
+      if(!cam){ setResult('No camera selected'); return; }
+      await startScanner(cam);
+    });
+    stopBtn.addEventListener('click', async ()=>{
+      await stopScanner();
+      setResult('Scanner stopped.');
+    });
+
+    // torch toggle (best-effort; not all cameras support it)
+    torchToggle.addEventListener('change', async ()=>{
+      if(!html5QrCode || !currentCameraId) return;
+      const track = html5QrCode.getState().stream ? html5QrCode.getState().stream.getVideoTracks()[0] : null;
+      if(!track) return;
+      const cap = track.getCapabilities && track.getCapabilities();
+      if(!cap || !cap.torch){
+        alert('Torch not supported on this device/camera');
+        torchToggle.checked = false;
+        return;
+      }
+      try{ await track.applyConstraints({ advanced: [{ torch: torchToggle.checked }] }); }catch(e){ console.warn(e); }
+    });
+
+    // when user selects a different camera, restart if running
+    cameraSelect.addEventListener('change', async ()=>{
+      if(isRunning){
+        await stopScanner();
+        await startScanner(cameraSelect.value);
+      }
+    });
+
+    // initialize
+    (async ()=>{
+      await listCameras();
+      // For some embed environments, automatic start isn't allowed; leave it to user to press Start.
+      setResult('Select a camera and press Start.');
+    })();
+
+    // Make widget auto-resize inside embeds
+    function sendSize(){
+      if(window.parent && window.parent !== window){
+        try{ window.parent.postMessage({type:'resize',height: document.documentElement.scrollHeight}, '*'); }catch(e){}
+      }
+    }
+    new ResizeObserver(sendSize).observe(document.documentElement);
+  </script>
+</body>
+</html>
